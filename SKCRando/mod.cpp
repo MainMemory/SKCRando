@@ -3,21 +3,367 @@
 #include <numeric>
 #include "IniFile.hpp"
 #include "SKCModLoader.h"
+#include "MidiInterface.h"
+#include "Trampoline.h"
 
 using std::unordered_map;
+using std::vector;
 using std::string;
 using std::wstring;
 using std::transform;
 
 std::default_random_engine gen;
 
+int musmode;
 int sslaymode;
 int ssnums[16];
 char sslayouts[16][1026];
+Trampoline* LoadSongTramp = nullptr;
+unordered_map<int, int> MusicMap;
+
+const int MusicIDs[] = {
+	MusicID_AngelIsland1,
+	MusicID_AngelIsland2,
+	MusicID_Hydrocity1,
+	MusicID_Hydrocity2,
+	MusicID_MarbleGarden1,
+	MusicID_MarbleGarden2,
+	MusicID_CarnivalNight1,
+	MusicID_CarnivalNight2,
+	MusicID_FlyingBattery1,
+	MusicID_FlyingBattery2,
+	MusicID_IceCap1,
+	MusicID_IceCap2,
+	MusicID_LaunchBase1,
+	MusicID_LaunchBase2,
+	MusicID_MushroomHill1,
+	MusicID_MushroomHill2,
+	MusicID_Sandopolis1,
+	MusicID_Sandopolis2,
+	MusicID_LavaReef1,
+	MusicID_LavaReef2,
+	MusicID_SkySanctuary,
+	MusicID_DeathEgg1,
+	MusicID_DeathEgg2,
+	MusicID_SKMidboss,
+	MusicID_Boss,
+	MusicID_Doomsday,
+	MusicID_MagneticOrbs,
+	MusicID_SpecialStage,
+	MusicID_SlotMachine,
+	MusicID_GumballMachine,
+	MusicID_S3Knuckles,
+	MusicID_AzureLake,
+	MusicID_BalloonPark,
+	MusicID_DesertPalace,
+	MusicID_ChromeGadget,
+	MusicID_EndlessMine,
+	MusicID_S3Invincibility,
+	MusicID_CompetitionMenu,
+	MusicID_S3Midboss,
+	MusicID_LevelSelect,
+	MusicID_FinalBoss,
+	MusicID_S3Credits,
+	MusicID_SKKnuckles,
+	MusicID_SKInvincibility,
+	MusicID_SKCredits,
+};
+
+const int JingleIDs[] = {
+	MusicID_S3Title,
+	MusicID_GameOver,
+	MusicID_Continue,
+	MusicID_ActClear,
+	MusicID_ChaosEmerald,
+	MusicID_Drowning,
+	MusicID_S3AllClear,
+	MusicID_SKTitle,
+	MusicID_SKAllClear,
+};
+
+const int OneUpIDs[] = {
+	MusicID_S31Up,
+	MusicID_SK1Up,
+};
+
+vector<const char*> MusicNames = {
+	"MIDI",
+	"AngelIsland1",
+	"AngelIsland2",
+	"Hydrocity1",
+	"Hydrocity2",
+	"MarbleGarden1",
+	"MarbleGarden2",
+	"CarnivalNight1",
+	"CarnivalNight2",
+	"FlyingBattery1",
+	"FlyingBattery2",
+	"IceCap1",
+	"IceCap2",
+	"LaunchBase1",
+	"LaunchBase2",
+	"MushroomHill1",
+	"MushroomHill2",
+	"Sandopolis1",
+	"Sandopolis2",
+	"LavaReef1",
+	"LavaReef2",
+	"SkySanctuary",
+	"DeathEgg1",
+	"DeathEgg2",
+	"SKMidboss",
+	"Boss",
+	"Doomsday",
+	"MagneticOrbs",
+	"SpecialStage",
+	"SlotMachine",
+	"GumballMachine",
+	"S3Knuckles",
+	"AzureLake",
+	"BalloonPark",
+	"DesertPalace",
+	"ChromeGadget",
+	"EndlessMine",
+	"S3Invincibility",
+	"CompetitionMenu",
+	"S3Midboss",
+	"LevelSelect",
+	"FinalBoss",
+	"S3Credits",
+	"SKKnuckles",
+	"SKInvincibility",
+	"SKCredits",
+	"S3CCredits",
+	"S3Continue",
+	"SKCredits0525",
+	"GreenGrove1",
+	"GreenGrove2",
+	"RustyRuin1",
+	"RustyRuin2",
+	"VolcanoValley2",
+	"VolcanoValley1",
+	"SpringStadium1",
+	"SpringStadium2",
+	"DiamondDust1",
+	"DiamondDust2",
+	"GeneGadget1",
+	"GeneGadget2",
+	"PanicPuppet2",
+	"FinalFight",
+	"S3DSpecialStage",
+	"PanicPuppet1",
+	"S3DBoss2",
+	"S3DBoss1",
+	"S3DCredits",
+	"S3DInvincibility",
+	"S3DMenu",
+	"S4E1Boss",
+	"GreenHill",
+	"Labyrinth",
+	"Marble",
+	"StarLight",
+	"SpringYard",
+	"ScrapBrain",
+	"S1Invincibility",
+	"S1SpecialStage",
+	"S1Boss",
+	"FinalZone",
+	"S1Credits",
+	"CasinoNight2P",
+	"EmeraldHill",
+	"Metropolis",
+	"CasinoNight",
+	"MysticCave",
+	"MysticCave2P",
+	"AquaticRuin",
+	"S2DeathEgg",
+	"S2SpecialStage",
+	"S2Options",
+	"S2FinalBoss",
+	"ChemicalPlant",
+	"S2Boss",
+	"SkyChase",
+	"OilOcean",
+	"WingFortress",
+	"EmeraldHill2P",
+	"S22PResults",
+	"S2SuperSonic",
+	"HillTop",
+	"S2Invincibility",
+	"S2HiddenPalace",
+	"S2Credits",
+	"CasinoNight2PBeta",
+	"EmeraldHillBeta",
+	"MetropolisBeta",
+	"CasinoNightBeta",
+	"MysticCaveBeta",
+	"MysticCave2PBeta",
+	"AquaticRuinBeta",
+	"S2DeathEggBeta",
+	"S2SpecialStageBeta",
+	"S2OptionsBeta",
+	"S2FinalBossBeta",
+	"ChemicalPlantBeta",
+	"S2BossBeta",
+	"SkyChaseBeta",
+	"OilOceanBeta",
+	"WingFortressBeta",
+	"EmeraldHill2PBeta",
+	"S22PResultsBeta",
+	"S2SuperSonicBeta",
+	"HillTopBeta",
+	"S3DSpecialStageBeta",
+	"ProtoAngelIsland1",
+	"ProtoAngelIsland2",
+	"ProtoHydrocity1",
+	"ProtoHydrocity2",
+	"ProtoCarnivalNight1",
+	"ProtoCarnivalNight2",
+	"ProtoFlyingBattery1",
+	"ProtoFlyingBattery2",
+	"ProtoIceCap1",
+	"ProtoIceCap2",
+	"ProtoLaunchBase1",
+	"ProtoLaunchBase2",
+	"ProtoMushroomHill1",
+	"ProtoMushroomHill2",
+	"ProtoLavaReef1",
+	"ProtoLavaReef2",
+	"ProtoSkySanctuary",
+	"ProtoDoomsday",
+	"ProtoSpecialStage",
+	"ProtoKnuckles",
+	"ProtoBalloonPark",
+	"ProtoDesertPalace",
+	"ProtoChromeGadget",
+	"ProtoContinue",
+	"ProtoCompetitionMenu",
+	"ProtoLevelSelect",
+	"ProtoCredits",
+	"ProtoUnused",
+	"CarnivalNight1PC",
+	"CarnivalNight2PC",
+	"IceCap1PC",
+	"IceCap2PC",
+	"LaunchBase1PC",
+	"LaunchBase2PC",
+	"KnucklesPC",
+	"CompetitionMenuPC",
+	"UnusedPC",
+	"CreditsPC",
+	"S3InvincibilityPC",
+};
+
+vector<const char*> JingleNames = {
+	"MIDI",
+	"S3Title",
+	"GameOver",
+	"Continue",
+	"ActClear",
+	"ChaosEmerald",
+	"Drowning",
+	"S3AllClear",
+	"SKTitle",
+	"SKAllClear",
+	"SKTitle0525",
+	"SKAllClear0525",
+	"S3DEnding",
+	"S3DIntro",
+	"S1Title",
+	"S1Ending",
+	"S1ActClear",
+	"S1GameOver",
+	"S1Continue",
+	"S1Drowning",
+	"S1ChaosEmerald",
+	"S2Ending",
+	"S2Title",
+	"ProtoActClear",
+};
+
+vector<const char*> OneUpNames = {
+	"MIDI",
+	"S31Up",
+	"SK1Up",
+	"S11Up",
+};
+
+const char* const MusicOptions[] = {
+	"AngelIsland1Track",
+	"AngelIsland2Track",
+	"Hydrocity1Track",
+	"Hydrocity2Track",
+	"MarbleGarden1Track",
+	"MarbleGarden2Track",
+	"CarnivalNight1Track",
+	"CarnivalNight2Track",
+	"FlyingBattery1Track",
+	"FlyingBattery2Track",
+	"IceCap1Track",
+	"IceCap2Track",
+	"LaunchBase1Track",
+	"LaunchBase2Track",
+	"MushroomHill1Track",
+	"MushroomHill2Track",
+	"Sandopolis1Track",
+	"Sandopolis2Track",
+	"LavaReef1Track",
+	"LavaReef2Track",
+	"SkySanctuaryTrack",
+	"DeathEgg1Track",
+	"DeathEgg2Track",
+	"MidbossTrack",
+	"BossTrack",
+	"DoomsdayTrack",
+	"MagneticOrbsTrack",
+	"SpecialStageTrack",
+	"SlotMachineTrack",
+	"GumballMachineTrack",
+	"KnucklesTrack",
+	"AzureLakeTrack",
+	"BalloonParkTrack",
+	"DesertPalaceTrack",
+	"ChromeGadgetTrack",
+	"EndlessMineTrack",
+	"ContinueTrack",
+	"InvincibilityTrack",
+	"CompetitionMenuTrack",
+	"UnusedTrack",
+	"LevelSelectTrack",
+	"FinalBossTrack",
+	"CreditsTrack",
+	"KnucklesTrack",
+	"HiddenPalaceTrack",
+	"SuperSonicTrack",
+	"EndingTrack",
+	"DataSelectTrack",
+	"BlueSphereTitleTrack",
+	"BlueSphereDifficultyTrack",
+	"TimeAttackRecordsTrack",
+	"KnucklesBossTrack"
+};
+
+const char* const JingleOptions[] = {
+	"TitleScreenTrack",
+	"GameOverTrack",
+	"ActClearTrack",
+	"ChaosEmeraldTrack",
+	"DrowningTrack",
+	"AllClearTrack",
+	"SpecialStageResultTrack",
+	"BlueSphereResultTrack"
+};
 
 DataArray(short, word_69EC1F, 0x69EC1F, 1);
 DataPointer(void*, dword_8FFE446, 0x8FFE446);
 DataPointer(short, word_8FFFFAC, 0x8FFFFAC);
+
+int LoadSong_r(int song)
+{
+	if (MusicMap.find(song - 1) != MusicMap.cend())
+		song = MusicMap[song - 1] + 1;
+	return ((decltype(LoadSong_r)*)LoadSongTramp->Target())(song);
+}
 
 void LoadRandomStageMap(int ssnum)
 {
@@ -147,12 +493,14 @@ void LoadSpecialStageMap_r()
 		switch (sslaymode)
 		{
 		case 1:
+		{
 			int laynum = ssnums[ssnum];
 			if (laynum & 8)
 				LoadSKStageMap(laynum & 7);
 			else
 				LoadS3StageMap(laynum);
-			break;
+		}
+		break;
 		case 2:
 			LoadBSStageMap();
 			break;
@@ -168,6 +516,12 @@ void LoadSpecialStageMap_r()
 	memcpy(&Target_palette[56], a1.Word, 16);
 	memcpy(&Target_palette[40], &a1.Word[16], 6);
 }
+
+unordered_map<string, int> musmodes = {
+	{ "off", 0 },
+	{ "swap", 1 },
+	{ "rand", 2 }
+};
 
 unordered_map<string, int> ssmodes = {
 	{ "off", 0 },
@@ -193,10 +547,98 @@ extern "C"
 		unsigned int seed = settings->getInt("", "seed");
 		if (seed == 0)
 			seed = std::random_device()();
-		gen.seed(seed);
+		std::seed_seq seq = { seed };
+		gen.seed(seq);
 		helperFunctions.PrintDebug("Seed: %u\n", seed);
+		string musrandstr = settings->getString("", "musrand", "off");
+		transform(musrandstr.cbegin(), musrandstr.cend(), musrandstr.begin(), tolower);
+		if (ssmodes.find(musrandstr) == musmodes.cend())
+			musrandstr = "off";
+		helperFunctions.PrintDebug("Music: %s\n", musrandstr.c_str());
+		musmode = musmodes[musrandstr];
+		switch (musmode)
+		{
+		case 1:
+		{
+			LoadSongTramp = new Trampoline(0x40B5EB, 0x40B5F0, LoadSong_r);
+			int* tmp = new int[LengthOfArray(MusicIDs)];
+			memcpy(tmp, MusicIDs, SizeOfArray(MusicIDs));
+			std::shuffle(tmp, tmp + LengthOfArray(MusicIDs), gen);
+			for (size_t i = 0; i < LengthOfArray(MusicIDs); ++i)
+				MusicMap[MusicIDs[i]] = tmp[i];
+			tmp = new int[LengthOfArray(JingleIDs)];
+			memcpy(tmp, JingleIDs, SizeOfArray(JingleIDs));
+			std::shuffle(tmp, tmp + LengthOfArray(JingleIDs), gen);
+			for (size_t i = 0; i < LengthOfArray(JingleIDs); ++i)
+				MusicMap[JingleIDs[i]] = tmp[i];
+			tmp = new int[LengthOfArray(OneUpIDs)];
+			memcpy(tmp, OneUpIDs, SizeOfArray(OneUpIDs));
+			std::shuffle(tmp, tmp + LengthOfArray(OneUpIDs), gen);
+			for (size_t i = 0; i < LengthOfArray(OneUpIDs); ++i)
+				MusicMap[OneUpIDs[i]] = tmp[i];
+		}
+		break;
+		case 2:
+			wchar_t pathbuf[MAX_PATH];
+			wcscpy_s(pathbuf, path);
+			wcscat_s(pathbuf, L"\\Music\\Music.txt");
+			FILE* f = _wfopen(pathbuf, L"r");
+			if (f)
+				while (!feof(f))
+				{
+					char line[1024];
+					if (!fgets(line, sizeof(line), f))
+						break;
+					if (strnlen(line, sizeof(line)) == 0)
+						continue;
+					MusicNames.push_back(_strdup(line));
+				}
+			fclose(f);
+			wcscpy_s(pathbuf, path);
+			wcscat_s(pathbuf, L"\\Music\\Jingle.txt");
+			f = _wfopen(pathbuf, L"r");
+			if (f)
+				while (!feof(f))
+				{
+					char line[1024];
+					if (!fgets(line, sizeof(line), f))
+						break;
+					if (strnlen(line, sizeof(line)) == 0)
+						continue;
+					JingleNames.push_back(_strdup(line));
+				}
+			fclose(f);
+			wcscpy_s(pathbuf, path);
+			wcscat_s(pathbuf, L"\\Music\\1Up.txt");
+			f = _wfopen(pathbuf, L"r");
+			if (f)
+				while (!feof(f))
+				{
+					char line[1024];
+					if (!fgets(line, sizeof(line), f))
+						break;
+					if (strnlen(line, sizeof(line)) == 0)
+						continue;
+					OneUpNames.push_back(_strdup(line));
+				}
+			fclose(f);
+			IniFile* muscfg = new IniFile(L"dummy.dum");
+			IniGroup* grp = muscfg->createGroup("All");
+			std::uniform_int_distribution<> musdist(0, MusicNames.size());
+			for (auto i : MusicOptions)
+				grp->setString(i, MusicNames[musdist(gen)]);
+			musdist = std::uniform_int_distribution<>(0, JingleNames.size());
+			for (auto i : JingleOptions)
+				grp->setString(i, JingleNames[musdist(gen)]);
+			musdist = std::uniform_int_distribution<>(0, OneUpNames.size());
+			grp->setString("OneUpTrack", OneUpNames[musdist(gen)]);
+			muscfg->save(wstring(path) + L"\\Music\\Music.ini");
+			break;
+		}
 		string ssrandstr = settings->getString("", "sslayrand", "off");
 		transform(ssrandstr.cbegin(), ssrandstr.cend(), ssrandstr.begin(), tolower);
+		if (ssmodes.find(ssrandstr) == ssmodes.cend())
+			ssrandstr = "off";
 		helperFunctions.PrintDebug("SS Layout: %s\n", ssrandstr.c_str());
 		sslaymode = ssmodes[ssrandstr];
 		if (sslaymode != 0)
