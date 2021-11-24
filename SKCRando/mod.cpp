@@ -1,6 +1,7 @@
 #include "pch.h"
 #include <random>
 #include <numeric>
+#include <dsound.h>
 #include "IniFile.hpp"
 #include "SKCModLoader.h"
 #include "MidiInterface.h"
@@ -14,12 +15,15 @@ using std::transform;
 
 std::default_random_engine gen;
 
-int musmode;
 int sslaymode;
 int ssnums[16];
 char sslayouts[16][1026];
 Trampoline* LoadSongTramp = nullptr;
+Trampoline* MonitorTramp = nullptr;
 unordered_map<int, int> MusicMap;
+unordered_map<uint16_t, uint16_t> LevelMap;
+char MonitorMap[10];
+char SFXMap[0xA9];
 
 const int MusicIDs[] = {
 	MusicID_AngelIsland1,
@@ -354,14 +358,127 @@ const char* const JingleOptions[] = {
 	"BlueSphereResultTrack"
 };
 
+const uint16_t LevelList_S3K[] = {
+	angel_island_zone_act_1,
+	hydrocity_zone_act_1,
+	marble_garden_zone_act_1,
+	carnival_night_zone_act_1,
+	icecap_zone_act_1,
+	launch_base_zone_act_1,
+	mushroom_hill_zone_act_1,
+	flying_battery_zone_act_1,
+	sandopolis_zone_act_1,
+	lava_reef_zone_act_1,
+	hidden_palace_zone,
+	sky_sanctuary_zone_act_1,
+	death_egg_zone_act_1,
+	doomsday_zone_act_1
+};
+
+const uint16_t LevelList_S3[] = {
+	angel_island_zone_act_1,
+	hydrocity_zone_act_1,
+	marble_garden_zone_act_1,
+	carnival_night_zone_act_1,
+	icecap_zone_act_1,
+	launch_base_zone_act_1
+};
+
+const uint16_t LevelList_SK[] = {
+	mushroom_hill_zone_act_1,
+	flying_battery_zone_act_1,
+	sandopolis_zone_act_1,
+	lava_reef_zone_act_1,
+	hidden_palace_zone,
+	sky_sanctuary_zone_act_1,
+	death_egg_zone_act_1,
+	doomsday_zone_act_1
+};
+
+const uint16_t NextLevelList[] = {
+	hydrocity_zone_act_1,
+	marble_garden_zone_act_1,
+	carnival_night_zone_act_1,
+	icecap_zone_act_1,
+	launch_base_zone_act_1,
+	mushroom_hill_zone_act_1,
+	flying_battery_zone_act_1,
+	sandopolis_zone_act_1,
+	lava_reef_zone_act_1,
+	hidden_palace_zone,
+	sky_sanctuary_zone_act_1,
+	death_egg_zone_act_1,
+	doomsday_zone_act_1,
+	ending_zone_act_2
+};
+
+const unordered_map<uint16_t, const char*> LevelNames = {
+	{ angel_island_zone_act_1, "Angel Island Zone" },
+	{ hydrocity_zone_act_1, "Hydro City Zone" },
+	{ marble_garden_zone_act_1, "Marble Garden Zone" },
+	{ carnival_night_zone_act_1, "Carnival Night Zone" },
+	{ icecap_zone_act_1, "Ice Cap Zone" },
+	{ launch_base_zone_act_1, "Launch Base Zone" },
+	{ mushroom_hill_zone_act_1, "Mushroom Hill Zone" },
+	{ flying_battery_zone_act_1, "Flying Battery Zone" },
+	{ sandopolis_zone_act_1, "Sandopolis Zone" },
+	{ lava_reef_zone_act_1, "Lava Reef Zone" },
+	{ hidden_palace_zone, "Hidden Palace Zone" },
+	{ sky_sanctuary_zone_act_1, "Sky Sanctuary Zone (Sonic)" },
+	{ death_egg_zone_act_1, "Death Egg Zone" },
+	{ doomsday_zone_act_1, "The Doomsday Zone" },
+	{ ending_zone_act_2, "Sonic Ending" },
+	{ sky_sanctuary_zone_act_2, "Sky Sanctuary Zone (Knuckles)" }
+};
+
 DataArray(short, word_69EC1F, 0x69EC1F, 1);
 DataPointer(void*, dword_8FFE446, 0x8FFE446);
 DataPointer(short, word_8FFFFAC, 0x8FFFFAC);
+DataPointer(uint16_t, Apparent_zone_and_act, 0x8FFEE4E);
+DataPointer(uint16_t, Restart_level_flag, 0x8FFFE02);
+DataPointer(uint8_t, Last_star_post_hit, 0x8FFFE2A);
+DataPointer(uint8_t, Special_bonus_entry_flag, 0x8FFFE48);
+
+void StartNewLevel_r()
+{
+	uint16_t lev = reg_d0.UWord;
+	if (LevelMap.find(lev) != LevelMap.cend())
+		lev = LevelMap.at(lev);
+	if (lev == UINT16_MAX)
+	{
+		Game_mode = GameModeID_S3Credits;
+	}
+	else
+	{
+		Current_zone_and_act = lev;
+		Apparent_zone_and_act = lev;
+		Restart_level_flag = 1;
+		Last_star_post_hit = 0;
+		Special_bonus_entry_flag = 0;
+	}
+}
+
+void LoadMHZ1()
+{
+	reg_d0.UWord = mushroom_hill_zone_act_1;
+	StartNewLevel_r();
+}
+
+void MonitorSwap()
+{
+	reg_a0.Object->air_left = MonitorMap[reg_a0.Object->air_left];
+	((decltype(MonitorSwap)*)MonitorTramp->Target())();
+}
+
+char SFXSwap()
+{
+	return SFXMap[reg_d0.Byte];
+}
 
 int LoadSong_r(int song)
 {
 	if (MusicMap.find(song - 1) != MusicMap.cend())
-		song = MusicMap[song - 1] + 1;
+		song = MusicMap.at(song - 1) + 1;
 	return ((decltype(LoadSong_r)*)LoadSongTramp->Target())(song);
 }
 
@@ -517,6 +634,12 @@ void LoadSpecialStageMap_r()
 	memcpy(&Target_palette[40], &a1.Word[16], 6);
 }
 
+unordered_map<string, int> levmodes = {
+	{ "off", 0 },
+	{ "orig", 1 },
+	{ "mix", 2 }
+};
+
 unordered_map<string, int> musmodes = {
 	{ "off", 0 },
 	{ "swap", 1 },
@@ -530,6 +653,8 @@ unordered_map<string, int> ssmodes = {
 	{ "rand", 3 }
 };
 
+char startlevelcode[] = { 0x66, 0xB8, 0xFF, 0xFF, 0x66, 0xA3, 0x10, 0xFE, 0xFF, 0x08, 0x66, 0xA3, 0x4E, 0xEE, 0xFF, 0x08 };
+
 char ssprobtbl[0x20] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	1, 1,
@@ -539,23 +664,147 @@ char ssprobtbl[0x20] = {
 	5
 };
 
+template <typename T, size_t N>
+void CopyShuffle(const T (&src)[N], T *dst)
+{
+	std::copy(src, src + N, dst);
+	std::shuffle(dst, dst + N, gen);
+}
+
+#define PrintSpoiler if (spoilers) helperFunctions.PrintDebug
+#define PathCat(s) wcscpy_s(pathbuf, path); wcscat_s(pathbuf, s)
 extern "C"
 {
 	__declspec(dllexport) void Init(const wchar_t* path, const HelperFunctions& helperFunctions)
 	{
-		const IniFile* settings = new IniFile(wstring(path) + L"\\config.ini");
+		wchar_t pathbuf[MAX_PATH];
+		PathCat(L"\\config.ini");
+		const IniFile* settings = new IniFile(pathbuf);
+		bool spoilers = settings->getBool("", "spoil");
 		unsigned int seed = settings->getInt("", "seed");
 		if (seed == 0)
 			seed = std::random_device()();
 		std::seed_seq seq = { seed };
 		gen.seed(seq);
-		helperFunctions.PrintDebug("Seed: %u\n", seed);
+		PrintSpoiler("Seed: %u\n", seed);
+		string levrandstr = settings->getString("", "levrand", "off");
+		transform(levrandstr.cbegin(), levrandstr.cend(), levrandstr.begin(), tolower);
+		if (levmodes.find(levrandstr) == levmodes.cend())
+			levrandstr = "off";
+		PrintSpoiler("Levels: %s\n", levrandstr.c_str());
+		int levmode = levmodes[levrandstr];
+		if (levmode)
+		{
+			uint16_t* levelorder = new uint16_t[LengthOfArray(LevelList_S3K) + 1];
+			switch (levmode)
+			{
+			case 1:
+				CopyShuffle(LevelList_S3, levelorder);
+				CopyShuffle(LevelList_SK, levelorder + LengthOfArray(LevelList_S3));
+				break;
+			case 2:
+				CopyShuffle(LevelList_S3K, levelorder);
+				break;
+			}
+			levelorder[LengthOfArray(LevelList_S3K)] = gen() & 1 ? sky_sanctuary_zone_act_2 : ending_zone_act_2;
+			PrintSpoiler("%s\n", LevelNames.at(levelorder[0]));
+			for (int i = 1; i <= LengthOfArray(LevelList_S3K); ++i)
+			{
+				PrintSpoiler("%s\n", LevelNames.at(levelorder[i]));
+				for (int j = 0; j < LengthOfArray(LevelList_S3K); ++j)
+					if (LevelList_S3K[j] == levelorder[i - 1])
+					{
+						if (GameSelection == 2 && i == LengthOfArray(LevelList_S3))
+							LevelMap[NextLevelList[j]] = UINT16_MAX;
+						else
+						{
+							LevelMap[NextLevelList[j]] = levelorder[i];
+							if (j == LengthOfArray(LevelList_S3K) - 1)
+								LevelMap[sky_sanctuary_zone_act_2] = levelorder[i];
+						}
+						break;
+					}
+			}
+			WriteJump((void*)0x6F2A3C, StartNewLevel_r);
+			WriteJump((void*)0x75B403, (void*)0x75B418); // always go to DDZ after DEZ Boss
+			WriteData((uint16_t*)0x7C209F, (uint16_t)sky_sanctuary_zone_act_1); // go to SSZ1 instead of SSZ2
+			WriteCall((void*)0x7DD204, LoadMHZ1);
+			WriteData((uint16_t*)0x6DE677, levelorder[LengthOfArray(LevelList_S3)]); // starting zone for S&K
+			*(uint16_t*)&startlevelcode[2] = levelorder[0];
+			WriteData((char*)0x6E27B3, startlevelcode);
+			WriteData((char*)0x6E2FB4, startlevelcode);
+			WriteData((char*)0x6EACFE, startlevelcode);
+			WriteData((char*)0x6EB33D, startlevelcode);
+			delete[] levelorder;
+		}
+		string ssrandstr = settings->getString("", "sslayrand", "off");
+		transform(ssrandstr.cbegin(), ssrandstr.cend(), ssrandstr.begin(), tolower);
+		if (ssmodes.find(ssrandstr) == ssmodes.cend())
+			ssrandstr = "off";
+		PrintSpoiler("SS Layout: %s\n", ssrandstr.c_str());
+		sslaymode = ssmodes[ssrandstr];
+		if (sslaymode != 0)
+		{
+			WriteJump(LoadSpecialStageMap, LoadSpecialStageMap_r);
+			switch (sslaymode)
+			{
+			case 1:
+				std::iota(ssnums, &ssnums[16], 0);
+				std::shuffle(ssnums, &ssnums[16], gen);
+				for (int i = 0; i < 16; i++)
+					PrintSpoiler("SS%d Layout: %d\n", i + 1, ssnums[i] + 1);
+				break;
+			case 2:
+				for (int i = 0; i < 16; i++)
+				{
+					do
+					{
+						ssnums[i] = gen() & 0x7F7F7F7F;
+					}
+					while (std::find(ssnums, &ssnums[i], ssnums[i]) != &ssnums[i]);
+					PrintSpoiler("SS%d Layout: %d\n", i + 1, ssnums[i]);
+				}
+				break;
+			case 3:
+				std::uniform_int_distribution<> ssdist(0, 0x1F);
+				for (int i = 0; i < 16; i++)
+				{
+					short rings = 0;
+					for (int j = 1; j < 1024; j++)
+					{
+						sslayouts[i][j] = ssprobtbl[ssdist(gen)];
+						if (sslayouts[i][j] == 4)
+							++rings;
+					}
+					*(unsigned short*)&sslayouts[i][0x400] = rings;
+				}
+				break;
+			}
+		}
+		if (settings->getBool("", "monrand"))
+		{
+			std::iota(MonitorMap, &MonitorMap[10], 0);
+			std::shuffle(MonitorMap, &MonitorMap[10], gen);
+			MonitorTramp = new Trampoline(0x799BB0, 0x799BB6, MonitorSwap);
+		}
+		if (settings->getBool("", "sfxrand"))
+		{
+			std::iota(SFXMap, &SFXMap[LengthOfArray(SFXMap)], 0x33);
+			std::swap(SFXMap[0], SFXMap[1]);
+			std::shuffle(&SFXMap[1], &SFXMap[0x89], gen);
+			std::swap(SFXMap[0], SFXMap[1]);
+			std::shuffle(&SFXMap[0x89], &SFXMap[LengthOfArray(SFXMap)], gen);
+			WriteCall((void*)0x40A9A9, SFXSwap);
+			WriteData((char*)0x40AA8E, ((char*)0x82C878)[SFXMap[0x78]]);
+		}
 		string musrandstr = settings->getString("", "musrand", "off");
 		transform(musrandstr.cbegin(), musrandstr.cend(), musrandstr.begin(), tolower);
-		if (ssmodes.find(musrandstr) == musmodes.cend())
+		if (musmodes.find(musrandstr) == musmodes.cend())
 			musrandstr = "off";
-		helperFunctions.PrintDebug("Music: %s\n", musrandstr.c_str());
-		musmode = musmodes[musrandstr];
+		PrintSpoiler("Music: %s\n", musrandstr.c_str());
+		int musmode = musmodes[musrandstr];
+		PathCat(L"\\Music\\Music.ini");
+		DeleteFile(pathbuf);
 		switch (musmode)
 		{
 		case 1:
@@ -579,9 +828,7 @@ extern "C"
 		}
 		break;
 		case 2:
-			wchar_t pathbuf[MAX_PATH];
-			wcscpy_s(pathbuf, path);
-			wcscat_s(pathbuf, L"\\Music\\Music.txt");
+			PathCat(L"\\Music\\Music.txt");
 			FILE* f = _wfopen(pathbuf, L"r");
 			if (f)
 				while (!feof(f))
@@ -594,8 +841,7 @@ extern "C"
 					MusicNames.push_back(_strdup(line));
 				}
 			fclose(f);
-			wcscpy_s(pathbuf, path);
-			wcscat_s(pathbuf, L"\\Music\\Jingle.txt");
+			PathCat(L"\\Music\\Jingle.txt");
 			f = _wfopen(pathbuf, L"r");
 			if (f)
 				while (!feof(f))
@@ -608,8 +854,7 @@ extern "C"
 					JingleNames.push_back(_strdup(line));
 				}
 			fclose(f);
-			wcscpy_s(pathbuf, path);
-			wcscat_s(pathbuf, L"\\Music\\1Up.txt");
+			PathCat(L"\\Music\\1Up.txt");
 			f = _wfopen(pathbuf, L"r");
 			if (f)
 				while (!feof(f))
@@ -622,7 +867,8 @@ extern "C"
 					OneUpNames.push_back(_strdup(line));
 				}
 			fclose(f);
-			IniFile* muscfg = new IniFile(L"dummy.dum");
+			PathCat(L"\\Music\\Music.ini");
+			IniFile* muscfg = new IniFile(pathbuf);
 			IniGroup* grp = muscfg->createGroup("All");
 			std::uniform_int_distribution<> musdist(0, MusicNames.size());
 			for (auto i : MusicOptions)
@@ -632,52 +878,9 @@ extern "C"
 				grp->setString(i, JingleNames[musdist(gen)]);
 			musdist = std::uniform_int_distribution<>(0, OneUpNames.size());
 			grp->setString("OneUpTrack", OneUpNames[musdist(gen)]);
-			muscfg->save(wstring(path) + L"\\Music\\Music.ini");
+			muscfg->save(pathbuf);
+			delete muscfg;
 			break;
-		}
-		string ssrandstr = settings->getString("", "sslayrand", "off");
-		transform(ssrandstr.cbegin(), ssrandstr.cend(), ssrandstr.begin(), tolower);
-		if (ssmodes.find(ssrandstr) == ssmodes.cend())
-			ssrandstr = "off";
-		helperFunctions.PrintDebug("SS Layout: %s\n", ssrandstr.c_str());
-		sslaymode = ssmodes[ssrandstr];
-		if (sslaymode != 0)
-		{
-			WriteJump(LoadSpecialStageMap, LoadSpecialStageMap_r);
-			switch (sslaymode)
-			{
-			case 1:
-				std::iota(ssnums, &ssnums[16], 0);
-				std::shuffle(ssnums, &ssnums[16], gen);
-				for (int i = 0; i < 16; i++)
-					helperFunctions.PrintDebug("SS%d Layout: %d\n", i + 1, ssnums[i] + 1);
-				break;
-			case 2:
-				for (int i = 0; i < 16; i++)
-				{
-					do
-					{
-						ssnums[i] = gen() & 0x7F7F7F7F;
-					}
-					while (std::find(ssnums, &ssnums[i], ssnums[i]) != &ssnums[i]);
-					helperFunctions.PrintDebug("SS%d Layout: %d\n", i + 1, ssnums[i]);
-				}
-				break;
-			case 3:
-				std::uniform_int_distribution<> ssdist(0, 0x1F);
-				for (int i = 0; i < 16; i++)
-				{
-					short rings = 0;
-					for (int j = 1; j < 1024; j++)
-					{
-						sslayouts[i][j] = ssprobtbl[ssdist(gen)];
-						if (sslayouts[i][j] == 4)
-							++rings;
-					}
-					*(unsigned short*)&sslayouts[i][0x400] = rings;
-				}
-				break;
-			}
 		}
 		delete settings;
 	}
