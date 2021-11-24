@@ -1,7 +1,6 @@
 #include "pch.h"
 #include <random>
 #include <numeric>
-#include <dsound.h>
 #include "IniFile.hpp"
 #include "SKCModLoader.h"
 #include "MidiInterface.h"
@@ -708,10 +707,10 @@ extern "C"
 			}
 			levelorder[LengthOfArray(LevelList_S3K)] = gen() & 1 ? sky_sanctuary_zone_act_2 : ending_zone_act_2;
 			PrintSpoiler("%s\n", LevelNames.at(levelorder[0]));
-			for (int i = 1; i <= LengthOfArray(LevelList_S3K); ++i)
+			for (size_t i = 1; i <= LengthOfArray(LevelList_S3K); ++i)
 			{
 				PrintSpoiler("%s\n", LevelNames.at(levelorder[i]));
-				for (int j = 0; j < LengthOfArray(LevelList_S3K); ++j)
+				for (size_t j = 0; j < LengthOfArray(LevelList_S3K); ++j)
 					if (LevelList_S3K[j] == levelorder[i - 1])
 					{
 						if (GameSelection == 2 && i == LengthOfArray(LevelList_S3))
