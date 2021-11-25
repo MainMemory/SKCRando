@@ -450,6 +450,7 @@ DataPointer(uint16_t, Apparent_zone_and_act, 0x8FFEE4E);
 DataPointer(uint16_t, Restart_level_flag, 0x8FFFE02);
 DataPointer(uint8_t, Last_star_post_hit, 0x8FFFE2A);
 DataPointer(uint8_t, Special_bonus_entry_flag, 0x8FFFE48);
+VoidFunc(Refresh_PlaneFull, 0x6ADFAB);
 
 void StartNewLevel_r()
 {
@@ -474,6 +475,12 @@ void LoadMHZ1()
 {
 	reg_d0.UWord = mushroom_hill_zone_act_1;
 	StartNewLevel_r();
+}
+
+void FixAIZIntro()
+{
+	reg_d0.Long = 0;
+	Refresh_PlaneFull();
 }
 
 void MonitorSwap()
@@ -745,6 +752,7 @@ extern "C"
 			WriteData((char*)0x6E2FB4, startlevelcode);
 			WriteData((char*)0x6EACFE, startlevelcode);
 			WriteData((char*)0x6EB33D, startlevelcode);
+			WriteData((decltype(FixAIZIntro)**)0x6B21B7, FixAIZIntro);
 			delete[] levelorder;
 		}
 		string ssrandstr = settings->getString("", "sslayrand", "off");
