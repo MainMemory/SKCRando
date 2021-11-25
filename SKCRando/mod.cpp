@@ -19,7 +19,7 @@ int ssnums[16];
 char sslayouts[16][1026];
 Trampoline* LoadSongTramp = nullptr;
 Trampoline* MonitorTramp = nullptr;
-unordered_map<int, int> MusicMap;
+int MusicMap[MusicID_SKCredits + 1];
 unordered_map<uint16_t, uint16_t> LevelMap;
 char MonitorMap[10];
 char SFXMap[0xA9];
@@ -430,6 +430,19 @@ const unordered_map<uint16_t, const char*> LevelNames = {
 	{ sky_sanctuary_zone_act_2, "Sky Sanctuary Zone (Knuckles)" }
 };
 
+const char*const MonitorNames[] = {
+	"Blank",
+	"1Up",
+	"Eggman",
+	"Rings",
+	"Speed Shoes",
+	"Fire Shield",
+	"Lightning Shield",
+	"Bubble Shield",
+	"Invincibility",
+	"Super Sonic"
+};
+
 DataArray(short, word_69EC1F, 0x69EC1F, 1);
 DataPointer(void*, dword_8FFE446, 0x8FFE446);
 DataPointer(short, word_8FFFFAC, 0x8FFFFAC);
@@ -471,14 +484,12 @@ void MonitorSwap()
 
 char SFXSwap()
 {
-	return SFXMap[reg_d0.Byte];
+	return SFXMap[reg_d0.UByte - 0x33];
 }
 
 int LoadSong_r(int song)
 {
-	if (MusicMap.find(song - 1) != MusicMap.cend())
-		song = MusicMap.at(song - 1) + 1;
-	return ((decltype(LoadSong_r)*)LoadSongTramp->Target())(song);
+	return ((decltype(LoadSong_r)*)LoadSongTramp->Target())(MusicMap[song - 1] + 1);
 }
 
 void LoadRandomStageMap(int ssnum)
@@ -751,7 +762,7 @@ extern "C"
 				std::iota(ssnums, &ssnums[16], 0);
 				std::shuffle(ssnums, &ssnums[16], gen);
 				for (int i = 0; i < 16; i++)
-					PrintSpoiler("SS%d Layout: %d\n", i + 1, ssnums[i] + 1);
+					PrintSpoiler("SS%d -> SS%d\n", i + 1, ssnums[i] + 1);
 				break;
 			case 2:
 				for (int i = 0; i < 16; i++)
@@ -761,7 +772,7 @@ extern "C"
 						ssnums[i] = gen() & 0x7F7F7F7F;
 					}
 					while (std::find(ssnums, &ssnums[i], ssnums[i]) != &ssnums[i]);
-					PrintSpoiler("SS%d Layout: %d\n", i + 1, ssnums[i]);
+					PrintSpoiler("SS%d -> Stage %d\n", i + 1, ssnums[i]);
 				}
 				break;
 			case 3:
@@ -785,6 +796,12 @@ extern "C"
 			std::iota(MonitorMap, &MonitorMap[10], 0);
 			std::shuffle(MonitorMap, &MonitorMap[10], gen);
 			MonitorTramp = new Trampoline(0x799BB0, 0x799BB6, MonitorSwap);
+			if (spoilers)
+			{
+				helperFunctions.PrintDebug("Monitors:\n");
+				for (size_t i = 0; i < 10; ++i)
+					helperFunctions.PrintDebug("%s -> %s\n", MonitorNames[i], MonitorNames[MonitorMap[i]]);
+			}
 		}
 		if (settings->getBool("", "sfxrand"))
 		{
@@ -795,6 +812,12 @@ extern "C"
 			std::shuffle(&SFXMap[0x89], &SFXMap[LengthOfArray(SFXMap)], gen);
 			WriteCall((void*)0x40A9A9, SFXSwap);
 			WriteData((char*)0x40AA8E, ((char*)0x82C878)[SFXMap[0x78]]);
+			if (spoilers)
+			{
+				helperFunctions.PrintDebug("SFX:\n");
+				for (size_t i = 0; i < LengthOfArray(SFXMap); ++i)
+					helperFunctions.PrintDebug("%.2X -> %.2X\n", i + 0x33, (unsigned char)SFXMap[i]);
+			}
 		}
 		string musrandstr = settings->getString("", "musrand", "off");
 		transform(musrandstr.cbegin(), musrandstr.cend(), musrandstr.begin(), tolower);
@@ -830,6 +853,7 @@ extern "C"
 			PathCat(L"\\Music\\Music.txt");
 			FILE* f = _wfopen(pathbuf, L"r");
 			if (f)
+			{
 				while (!feof(f))
 				{
 					char line[1024];
@@ -839,10 +863,12 @@ extern "C"
 						continue;
 					MusicNames.push_back(_strdup(line));
 				}
-			fclose(f);
+				fclose(f);
+			}
 			PathCat(L"\\Music\\Jingle.txt");
 			f = _wfopen(pathbuf, L"r");
 			if (f)
+			{
 				while (!feof(f))
 				{
 					char line[1024];
@@ -852,10 +878,12 @@ extern "C"
 						continue;
 					JingleNames.push_back(_strdup(line));
 				}
-			fclose(f);
+				fclose(f);
+			}
 			PathCat(L"\\Music\\1Up.txt");
 			f = _wfopen(pathbuf, L"r");
 			if (f)
+			{
 				while (!feof(f))
 				{
 					char line[1024];
@@ -865,17 +893,18 @@ extern "C"
 						continue;
 					OneUpNames.push_back(_strdup(line));
 				}
-			fclose(f);
+				fclose(f);
+			}
 			PathCat(L"\\Music\\Music.ini");
 			IniFile* muscfg = new IniFile(pathbuf);
 			IniGroup* grp = muscfg->createGroup("All");
-			std::uniform_int_distribution<> musdist(0, MusicNames.size());
+			std::uniform_int_distribution<> musdist(0, MusicNames.size() - 1);
 			for (auto i : MusicOptions)
 				grp->setString(i, MusicNames[musdist(gen)]);
-			musdist = std::uniform_int_distribution<>(0, JingleNames.size());
+			musdist = std::uniform_int_distribution<>(0, JingleNames.size() - 1);
 			for (auto i : JingleOptions)
 				grp->setString(i, JingleNames[musdist(gen)]);
-			musdist = std::uniform_int_distribution<>(0, OneUpNames.size());
+			musdist = std::uniform_int_distribution<>(0, OneUpNames.size() - 1);
 			grp->setString("OneUpTrack", OneUpNames[musdist(gen)]);
 			muscfg->save(pathbuf);
 			delete muscfg;
