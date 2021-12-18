@@ -869,6 +869,8 @@ extern "C"
 						break;
 					if (strnlen(line, sizeof(line)) == 0)
 						continue;
+					if (line[strnlen(line, sizeof(line)) - 1] == '\n')
+						line[strnlen(line, sizeof(line)) - 1] = 0;
 					MusicNames.push_back(_strdup(line));
 				}
 				fclose(f);
@@ -884,6 +886,8 @@ extern "C"
 						break;
 					if (strnlen(line, sizeof(line)) == 0)
 						continue;
+					if (line[strnlen(line, sizeof(line)) - 1] == '\n')
+						line[strnlen(line, sizeof(line)) - 1] = 0;
 					JingleNames.push_back(_strdup(line));
 				}
 				fclose(f);
@@ -899,6 +903,8 @@ extern "C"
 						break;
 					if (strnlen(line, sizeof(line)) == 0)
 						continue;
+					if (line[strnlen(line, sizeof(line)) - 1] == '\n')
+						line[strnlen(line, sizeof(line)) - 1] = 0;
 					OneUpNames.push_back(_strdup(line));
 				}
 				fclose(f);
