@@ -444,12 +444,6 @@ const char*const MonitorNames[] = {
 };
 
 DataArray(short, word_69EC1F, 0x69EC1F, 1);
-DataPointer(void*, dword_8FFE446, 0x8FFE446);
-DataPointer(short, word_8FFFFAC, 0x8FFFFAC);
-DataPointer(uint16_t, Apparent_zone_and_act, 0x8FFEE4E);
-DataPointer(uint16_t, Restart_level_flag, 0x8FFFE02);
-DataPointer(uint8_t, Last_star_post_hit, 0x8FFFE2A);
-DataPointer(uint8_t, Special_bonus_entry_flag, 0x8FFFE48);
 VoidFunc(Refresh_PlaneFull, 0x6ADFAB);
 
 void StartNewLevel_r()
@@ -501,44 +495,44 @@ int LoadSong_r(int song)
 
 void LoadRandomStageMap(int ssnum)
 {
-	memset(Target_water_palette, 0, 0x600);
-	memcpy(Plane_buffer, sslayouts[ssnum], 0x400);
-	SS_start_angle = 0x4000;
-	SS_start_x = 0;
-	SS_start_y = 0;
-	SS_perfect_count = *(unsigned short*)&sslayouts[ssnum][0x400];
+	memset(SStage_layout_buffer, 0, 0x600);
+	memcpy(&SStage_layout_buffer + 0x100, sslayouts[ssnum], 0x400);
+	Special_stage_angle = 0x4000;
+	Special_stage_X_pos = 0;
+	Special_stage_Y_pos = 0;
+	Special_stage_rings_left = *(unsigned short*)&sslayouts[ssnum][0x400];
 }
 
 void LoadBSStageMap()
 {
 	Kosinski_Decomp(SSCompressedLayoutPointers[1], RAM_start);
-	memset(Target_water_palette, 0, 0x600);
-	if (BS_special_stage_flag)
+	memset(SStage_layout_buffer, 0, 0x600);
+	if (Blue_spheres_stage_flag)
 		Current_special_stage = 0;
 	else
 	{
 		int ssnum = Current_special_stage;
 		if (SK_alone_flag || SK_special_stage_flag)
 			ssnum += 8;
-		Blue_sphere_stage_number = ssnums[ssnum];
+		*reinterpret_cast<int*>(&Blue_spheres_current_stage) = ssnums[ssnum];
 	}
-	SS_start_angle = 0x4000;
-	SS_start_x = 0x1000;
-	SS_start_y = 0x300;
-	SS_perfect_count = 0;
-	word_8FFFFAC = 0;
-	char* stgid = (char*)&Blue_sphere_stage_number;
+	Special_stage_angle = 0x4000;
+	Special_stage_X_pos = 0x1000;
+	Special_stage_Y_pos = 0x300;
+	Special_stage_rings_left = 0;
+	Blue_spheres_difficulty = 0;
+	char* stgid = Blue_spheres_current_stage;
 	short* wordthing = word_69EC1F;
 	for (int part = 0; part < 4; part++)
 	{
 		char v22 = *(stgid++);
-		SS_perfect_count += (unsigned __int8)RAM_start[v22 & 0x7F];
-		word_8FFFFAC += (unsigned __int8)RAM_start[(v22 & 0x7F) + 128];
+		Special_stage_rings_left += (unsigned __int8)RAM_start[v22 & 0x7F];
+		Blue_spheres_difficulty += (unsigned __int8)RAM_start[(v22 & 0x7F) + 128];
 		char* src = &RAM_start[(signed __int16)((v22 & 0x7F) << 8) + 256];
 		short v23 = *(wordthing++);
 		short v24 = *(wordthing++);
 		short v25 = *(wordthing++);
-		char* dst = &Plane_buffer[*(wordthing++)];
+		char* dst = &SStage_layout_buffer[0x100 + *(wordthing++)];
 		for (int y = 0; y < 16; y++)
 		{
 			short off = v24;
@@ -555,38 +549,38 @@ void LoadBSStageMap()
 
 void LoadS3StageMap(int ssnum)
 {
-	memset(Target_water_palette, 0, 0x600);
-	memcpy(Plane_buffer, SStageLayoutPtrs[ssnum], 0x400);
+	memset(SStage_layout_buffer, 0, 0x600);
+	memcpy(&SStage_layout_buffer + 0x100, SStageLayoutPtrs[ssnum], 0x400);
 	unsigned short* src = (unsigned short*)((char*)SStageLayoutPtrs[ssnum] + 0x400);
-	SS_start_angle = _byteswap_ushort(*(src++));
-	SS_start_x = _byteswap_ushort(*(src++));
-	SS_start_y = _byteswap_ushort(*(src++));
-	SS_perfect_count = _byteswap_ushort(*(src++));
+	Special_stage_angle = _byteswap_ushort(*(src++));
+	Special_stage_X_pos = _byteswap_ushort(*(src++));
+	Special_stage_Y_pos = _byteswap_ushort(*(src++));
+	Special_stage_rings_left = _byteswap_ushort(*(src++));
 }
 
 void LoadSKStageMap(int ssnum)
 {
 	Kosinski_Decomp(SSCompressedLayoutPointers[0], RAM_start);
-	memset(Target_water_palette, 0, 0x600);
-	memcpy(Plane_buffer, SSLayoutOffs_RAM[ssnum], 0x400);
+	memset(SStage_layout_buffer, 0, 0x600);
+	memcpy(&SStage_layout_buffer + 0x100, SSLayoutOffs_RAM[ssnum], 0x400);
 	unsigned short* src = (unsigned short*)((char*)SSLayoutOffs_RAM[ssnum] + 0x400);
-	SS_start_angle = _byteswap_ushort(*(src++));
-	SS_start_x = _byteswap_ushort(*(src++));
-	SS_start_y = _byteswap_ushort(*(src++));
-	SS_perfect_count = _byteswap_ushort(*(src++));
+	Special_stage_angle = _byteswap_ushort(*(src++));
+	Special_stage_X_pos = _byteswap_ushort(*(src++));
+	Special_stage_Y_pos = _byteswap_ushort(*(src++));
+	Special_stage_rings_left = _byteswap_ushort(*(src++));
 }
 
 void LoadSpecialStageMap_r()
 {
 	int ssnum;
-	if (BS_special_stage_flag)
+	if (Blue_spheres_stage_flag)
 	{
 		LoadBSStageMap();
-		ssnum = ((char*)&Blue_sphere_stage_number)[2];
+		ssnum = Blue_spheres_current_stage[2];
 	}
 	else
 	{
-		char emecnt = Emerald_count;
+		char emecnt = Chaos_emerald_count;
 		char flag;
 		if (SK_alone_flag)
 			flag = 0;
@@ -646,7 +640,7 @@ void LoadSpecialStageMap_r()
 	AReg a1 = { *(void**)((char*)&SS_Pal_Map_Ptrs[1] + 16 * (ssnum & 7)) };
 	if (ssnum & 8)
 		a1.Byte += 304;
-	dword_8FFE446 = a1.Unknown;
+	Special_stage_palette_addr = a1.Word;
 	memcpy(&Target_palette[56], a1.Word, 16);
 	memcpy(&Target_palette[40], &a1.Word[16], 6);
 }
@@ -670,6 +664,7 @@ unordered_map<string, int> ssmodes = {
 	{ "rand", 3 }
 };
 
+#pragma warning(suppress: 4838 4309)
 char startlevelcode[] = { 0x66, 0xB8, 0xFF, 0xFF, 0x66, 0xA3, 0x10, 0xFE, 0xFF, 0x08, 0x66, 0xA3, 0x4E, 0xEE, 0xFF, 0x08 };
 
 char ssprobtbl[0x20] = {
